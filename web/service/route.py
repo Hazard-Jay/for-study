@@ -8,7 +8,8 @@ from collections import defaultdict
 from. import topo
 
 def delay_weight(u, v, info):
-    return random.randint(1, 100)
+    return 1
+    # return random.randint(1, 100)
 
 def dijkstra(adj, src, dst, weight=delay_weight):
     """

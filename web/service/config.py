@@ -25,15 +25,20 @@ class DBConfig:
     # DEFAULT_DB_PATH = BASE_DIR / "data.db"
     # URL: str = getenv("DB_URL", f"sqlite:///{DEFAULT_DB_PATH}")
 
+    host = "192.168.241.1"
+    port = 3306
+    user = "sdn"
+    password = "StrongPassword_123"
+    database = "sdn"
+    charset = "utf8mb4"
+
 class PollingConfig:
     """
     轮询周期：
-    - 多久从 ONOS 拉一次拓扑 / 链路质量
-    - 多久做一次路径重计算检查
+    - 多久从 ONOS 拉一次拓扑 / 节点信息
     单位都是秒
     """
-    topoItl= 5
-    ndpItl= 5
+    topoItl= 100
 
 class Settings:
 

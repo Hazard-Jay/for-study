@@ -1,32 +1,18 @@
 package org.example.packet2py;
 
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
-import java.util.Locale;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-
 import org.onlab.packet.Ethernet;
 import org.onlab.packet.MacAddress;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.PortNumber;
-import org.onosproject.net.flow.DefaultTrafficSelector;
-import org.onosproject.net.flow.DefaultTrafficTreatment;
-import org.onosproject.net.flow.TrafficSelector;
-import org.onosproject.net.flow.TrafficTreatment;
-import org.onosproject.net.packet.DefaultOutboundPacket;
 import org.onosproject.net.packet.InboundPacket;
-import org.onosproject.net.packet.OutboundPacket;
 import org.onosproject.net.packet.PacketContext;
 import org.onosproject.net.packet.PacketPriority;
 import org.onosproject.net.packet.PacketProcessor;
 import org.onosproject.net.packet.PacketService;
+import org.onosproject.net.flow.TrafficSelector;
+import org.onosproject.net.flow.DefaultTrafficSelector;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Deactivate;
@@ -35,19 +21,23 @@ import org.osgi.service.component.annotations.ReferenceCardinality;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.Locale;
+
 @Component(immediate = true)
 public class PacketInToPythonApp {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private static final String PY_SERVICE_URL = "http://127.0.0.1:8000/pushFlows";
+    private static final String DEFAULT_PY_URL = "http://172.17.0.1:8000/pushFlows";
+    private static final String PY_SERVICE_URL = System.getenv().getOrDefault("PY_SERVICE_URL", DEFAULT_PY_URL);
 
     private ApplicationId appId;
     private final InternalPacketProcessor processor = new InternalPacketProcessor();
-
-    private final ExecutorService httpPool = Executors.newFixedThreadPool(2);
-    private final ConcurrentHashMap<String, Long> recent = new ConcurrentHashMap<>();
-    private final long dedupMs = 3000;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected CoreService coreService;
@@ -67,22 +57,27 @@ public class PacketInToPythonApp {
     protected void deactivate() {
         withdrawIntercepts();
         packetService.removeProcessor(processor);
-        httpPool.shutdownNow();
         log.info("PacketInToPythonApp stopped");
     }
 
     private void requestIntercepts() {
-        TrafficSelector s1 = DefaultTrafficSelector.builder().matchEthType(Ethernet.TYPE_ARP).build();
-        TrafficSelector s2 = DefaultTrafficSelector.builder().matchEthType(Ethernet.TYPE_IPV4).build();
-        packetService.requestPackets(s1, PacketPriority.REACTIVE, appId);
-        packetService.requestPackets(s2, PacketPriority.REACTIVE, appId);
+        TrafficSelector.Builder s1 = DefaultTrafficSelector.builder();
+        s1.matchEthType(Ethernet.TYPE_ARP);
+        packetService.requestPackets(s1.build(), PacketPriority.REACTIVE, appId);
+
+        TrafficSelector.Builder s2 = DefaultTrafficSelector.builder();
+        s2.matchEthType(Ethernet.TYPE_IPV4);
+        packetService.requestPackets(s2.build(), PacketPriority.REACTIVE, appId);
     }
 
     private void withdrawIntercepts() {
-        TrafficSelector s1 = DefaultTrafficSelector.builder().matchEthType(Ethernet.TYPE_ARP).build();
-        TrafficSelector s2 = DefaultTrafficSelector.builder().matchEthType(Ethernet.TYPE_IPV4).build();
-        packetService.cancelPackets(s1, PacketPriority.REACTIVE, appId);
-        packetService.cancelPackets(s2, PacketPriority.REACTIVE, appId);
+        TrafficSelector.Builder s1 = DefaultTrafficSelector.builder();
+        s1.matchEthType(Ethernet.TYPE_ARP);
+        packetService.cancelPackets(s1.build(), PacketPriority.REACTIVE, appId);
+
+        TrafficSelector.Builder s2 = DefaultTrafficSelector.builder();
+        s2.matchEthType(Ethernet.TYPE_IPV4);
+        packetService.cancelPackets(s2.build(), PacketPriority.REACTIVE, appId);
     }
 
     private class InternalPacketProcessor implements PacketProcessor {
@@ -101,72 +96,92 @@ public class PacketInToPythonApp {
             DeviceId deviceId = inPkt.receivedFrom().deviceId();
             PortNumber inPort = inPkt.receivedFrom().port();
 
-            short et = eth.getEtherType();
-            if (et == Ethernet.TYPE_ARP) {
-                flood(context, deviceId, inPkt.unparsed());
+            if (eth.getEtherType() == Ethernet.TYPE_ARP) {
+                context.treatmentBuilder().setOutput(PortNumber.FLOOD);
+                context.send();
                 return;
             }
 
-            if (et != Ethernet.TYPE_IPV4) {
+            if (eth.getEtherType() != Ethernet.TYPE_IPV4) {
                 return;
             }
 
             MacAddress srcMac = eth.getSourceMAC();
             MacAddress dstMac = eth.getDestinationMAC();
 
-            String key = srcMac.toString().toLowerCase(Locale.ROOT) + "->" + dstMac.toString().toLowerCase(Locale.ROOT);
-            long now = System.currentTimeMillis();
-            Long last = recent.get(key);
-            if (last != null && now - last < dedupMs) {
-                return;
+            String outPort = callPythonService(srcMac, dstMac, deviceId, inPort);
+            if (outPort != null && !outPort.isEmpty()) {
+                try {
+                    context.treatmentBuilder().setOutput(PortNumber.portNumber(outPort));
+                    context.send();
+                } catch (Exception e) {
+                    log.warn("PacketOut failed, device={}, outPort={}", deviceId, outPort, e);
+                }
             }
-            recent.put(key, now);
-
-            httpPool.submit(() -> callPythonService(srcMac, dstMac, deviceId, inPort));
         }
     }
 
-    private void flood(PacketContext context, DeviceId deviceId, ByteBuffer data) {
-        TrafficTreatment t = DefaultTrafficTreatment.builder().setOutput(PortNumber.FLOOD).build();
-        OutboundPacket out = new DefaultOutboundPacket(deviceId, t, data.duplicate());
-        packetService.emit(out);
-        context.block();
-    }
-
-    private void callPythonService(MacAddress srcMac,
-                                   MacAddress dstMac,
-                                   DeviceId deviceId,
-                                   PortNumber inPort) {
+    private String callPythonService(MacAddress srcMac,
+                                     MacAddress dstMac,
+                                     DeviceId deviceId,
+                                     PortNumber inPort) {
         HttpURLConnection conn = null;
         try {
             URL url = new URL(PY_SERVICE_URL);
             conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
             conn.setConnectTimeout(1000);
-            conn.setReadTimeout(3000);
+            conn.setReadTimeout(2000);
             conn.setDoOutput(true);
             conn.setRequestProperty("Content-Type", "application/json");
 
             String json = String.format(Locale.ROOT,
                     "{ \"srcMac\": \"%s\", \"dstMac\": \"%s\", \"deviceId\": \"%s\", \"inPort\": \"%s\" }",
-                    srcMac.toString(), dstMac.toString(), deviceId.toString(), inPort.toString());
+                    srcMac.toString(),
+                    dstMac.toString(),
+                    deviceId.toString(),
+                    inPort.toString());
 
             try (OutputStream os = conn.getOutputStream()) {
                 os.write(json.getBytes(StandardCharsets.UTF_8));
             }
 
             int code = conn.getResponseCode();
+            String body = readAll(code >= 200 && code < 300 ? conn.getInputStream() : conn.getErrorStream());
+
             if (code / 100 == 2) {
                 log.info("pushFlows OK, HTTP {}", code);
+                return extractOutPort(body);
             } else {
-                log.warn("pushFlows FAIL, HTTP {}, body={}", code, json);
+                log.warn("pushFlows FAIL, HTTP {}, url={}, body={}", code, PY_SERVICE_URL, json);
+                return null;
             }
         } catch (Exception e) {
             log.warn("Error calling pushFlows {}", PY_SERVICE_URL, e);
+            return null;
         } finally {
             if (conn != null) {
                 conn.disconnect();
             }
         }
+    }
+
+    private static String readAll(InputStream is) throws Exception {
+        if (is == null) return "";
+        byte[] buf = is.readAllBytes();
+        return new String(buf, StandardCharsets.UTF_8);
+    }
+
+    private static String extractOutPort(String body) {
+        if (body == null) return null;
+        int k = body.indexOf("\"outPort\"");
+        if (k < 0) return null;
+        int c = body.indexOf(":", k);
+        if (c < 0) return null;
+        int q1 = body.indexOf("\"", c);
+        if (q1 < 0) return null;
+        int q2 = body.indexOf("\"", q1 + 1);
+        if (q2 < 0) return null;
+        return body.substring(q1 + 1, q2);
     }
 }

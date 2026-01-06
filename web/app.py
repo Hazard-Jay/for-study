@@ -9,6 +9,9 @@ import random
 from service.route import dijkstra
 from collections import defaultdict
 from service.pushflows import pushflows
+import threading
+import time
+from db.topoSave import save_all,load_topo, load_details, load_node
 
 app=Sanic("SDN")
 app.config.FALLBACK_ERROR_FORMAT = "json"
@@ -27,20 +30,16 @@ async def index(request):
 # 把未被你显式处理的异常的“兜底（fallback）错误响应格式”设为 JSON。
 # 等价解释：当请求触发了未捕获异常，而你又没有自定义错误处理器时，Sanic 会按 FALLBACK_ERROR_FORMAT 生成响应；设为 "json" 就会返回 {"status":500, "message": "...", ...} 之类的 JSON。
 
-onosHost='127.0.0.1'
-auth= HTTPBasicAuth("karaf", "karaf")
-
 @app.get("/node")
 async def node(request):
-    return response.json(service.topo.getNode())
+    return response.json(load_node())
 
 @app.get("/details")
 async def details(request):
-    return response.json(service.topo.getDetails())
-
+    return response.json(load_details())
 @app.get("/topo")
 async def topo(request):
-    return response.json(service.topo.getTopo())
+    return response.json(load_topo())
 
 @app.get("/path")
 async def path(request):
@@ -53,8 +52,10 @@ async def path(request):
             status=400
         )
 
-    adj = service.topo.getTopo()
-    path, total_delay = dijkstra(adj, src, dst)
+    data = load_topo()
+    if data is None:
+        data = service.topo.getTopo(settings.onos.url)
+    path, total_delay = dijkstra(data, src, dst)
 
     if path is None:
         return response.json(
@@ -74,7 +75,7 @@ async def path(request):
 @app.post("/pushFlows")
 async def pushflows_post(request):
     data = request.json or {}
-    payload, status = pushflows(data.get("srcMac"), data.get("dstMac"))
+    payload, status = pushflows(data.get("srcMac"), data.get("dstMac"), data.get("deviceId"))
     return response.json(payload, status=status)
 
 @app.get("/pushFlows")
@@ -82,5 +83,21 @@ async def pushflows_get(request):
     payload, status = pushflows(request.args.get("srcMac"), request.args.get("dstMac"))
     return response.json(payload, status=status)
 
+def poll_save_loop():
+    while True:
+        try:
+            # details = service.topo.getDetails(f"http://{settings.db.host}:8181/onos/v1")
+            # topo = service.topo.getTopo(f"http://{settings.db.host}:8181/onos/v1")
+            # node = service.topo.getNode(f"http://{settings.db.host}:8181/onos/v1")
+            details = service.topo.getDetails(settings.onos.url)
+            topo = service.topo.getTopo(settings.onos.url)
+            node = service.topo.getNode(settings.onos.url)
+            save_all(details, topo, node)
+            # print("saved cache", time.time())
+        except Exception as e:
+            print("poll_save_loop error:", repr(e))
+        time.sleep(settings.poll.topoItl)
+
 if __name__ == "__main__":
+    threading.Thread(target=poll_save_loop, daemon=True).start()
     app.run(host="0.0.0.0", port=8000, single_process=True)

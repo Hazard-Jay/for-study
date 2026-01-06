@@ -7,26 +7,25 @@ from .config import settings
 from collections import defaultdict
 from service.route import dijkstra
 
-
-def getDevices():
-    url = f"{settings.onos.url}/devices"
-    res=requests.get(url=url, headers=settings.onos.headers, auth=settings.onos.auth)
+def getDevices(l):
+    url = f"{l}/devices"
+    res=requests.get(url=url, headers=settings.onos.headers, auth=settings.onos.auth,timeout=2)
     return res.json()
 
-def getLinks():
-    url = f"{settings.onos.url}/links"
-    res=requests.get(url=url, headers=settings.onos.headers, auth=settings.onos.auth)
+def getLinks(l):
+    url = f"{l}/links"
+    res=requests.get(url=url, headers=settings.onos.headers, auth=settings.onos.auth,timeout=2)
     return res.json()
 
-def getHosts():
-    url = f"{settings.onos.url}/hosts"
-    res=requests.get(url=url, headers=settings.onos.headers, auth=settings.onos.auth)
+def getHosts(l):
+    url = f"{l}/hosts"
+    res=requests.get(url=url, headers=settings.onos.headers, auth=settings.onos.auth,timeout=2)
     return res.json()
 
-def getDetails():
-    devices=getDevices()
-    hosts=getHosts()
-    links=getLinks()
+def getDetails(l):
+    devices=getDevices(l)
+    hosts=getHosts(l)
+    links=getLinks(l)
     topo_raw = {
         "devices": devices.get("devices", []),
         "links":   links.get("links", []),
@@ -58,8 +57,8 @@ def getDetails():
 #     ]
 # }
 
-def getNode():
-    topo=getDetails()
+def getNode(l):
+    topo=getDetails(l)
     adj = []
 
     for node in topo["devices"]:
@@ -70,10 +69,10 @@ def getNode():
     
     return adj
 
-def getTopo():
+def getTopo(l):
     # 获取邻接表
 
-    topo=getDetails()
+    topo=getDetails(l)
     adj = defaultdict(list)
 
     for link in topo["links"]:
@@ -109,59 +108,37 @@ def getTopo():
 
 def push_flow(device_id, src_mac, dst_mac, out_port,
               priority=10, permanent=True, timeout=0):
-    """
-    在指定 device 上下发一条流表：
-    match: src_mac, dst_mac, IPv4
-    action: OUTPUT out_port
-    """
     url = f"{settings.onos.url}/flows/{device_id}"
 
     flow = {
-        "priority": priority,
-        "isPermanent": permanent,
-        "timeout": timeout,
+        "priority": int(priority),
+        "isPermanent": bool(permanent),
+        "timeout": int(timeout),
         "deviceId": device_id,
         "treatment": {
             "instructions": [
-                {
-                    "type": "OUTPUT",
-                    "port": str(out_port)  # 注意字符串
-                }
+                {"type": "OUTPUT", "port": str(out_port)}
             ]
         },
         "selector": {
             "criteria": [
-                {
-                    "type": "ETH_TYPE",
-                    "ethType": "0x0800"  # IPv4
-                },
-                {
-                    "type": "ETH_SRC",
-                    "mac": src_mac
-                },
-                {
-                    "type": "ETH_DST",
-                    "mac": dst_mac
-                }
+                {"type": "ETH_TYPE", "ethType": "0x0800"},
+                {"type": "ETH_SRC", "mac": src_mac},
+                {"type": "ETH_DST", "mac": dst_mac}
             ]
         }
     }
 
-    body = {"flows": [flow]}
-
     res = requests.post(
         url=url,
-        json=body,
+        json=flow,
         headers=settings.onos.headers,
-        auth=settings.onos.auth
+        auth=settings.onos.auth,
+        timeout=2
     )
 
-    if res.status_code in (200, 201, 202):
-        print(f"[OK] push_flow to {device_id}, {src_mac}->{dst_mac} out {out_port}")
-    else:
-        print(f"[ERR] push_flow status={res.status_code}, body={res.text}")
+    return res.status_code, res.text
 
-    return res
 
 def delete_all_flows(device_id):
     """
