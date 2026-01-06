@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>SDN 控制面板</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <script src="/static/vis-network.min.js"></script>
+</head>
+<body>
+  <div class="app">
+    <div class="topbar">
+      <div class="brand">SDN 控制面板</div>
+      <div class="actions">
+        <button id="btnRefresh">刷新拓扑</button>
+        <button id="btnClear">清空选择</button>
+      </div>
+      <div class="status" id="status">未加载</div>
+    </div>
+
+    <div class="main">
+      <div class="left">
+        <div class="panelTitle">拓扑</div>
+        <div id="network"></div>
+      </div>
+
+      <div class="right">
+        <div class="card">
+          <div class="cardTitle">已选端点</div>
+          <div class="grid2">
+            <div class="field">
+              <div class="label">SRC Host ID</div>
+              <input id="srcHostId" placeholder="点击拓扑里的 host 自动填充" />
+            </div>
+            <div class="field">
+              <div class="label">DST Host ID</div>
+              <input id="dstHostId" placeholder="点击拓扑里的 host 自动填充" />
+            </div>
+          </div>
+          <div class="row">
+            <button id="btnPath">计算路径</button>
+            <div class="hint">调用 /path?src=...&dst=...</div>
+          </div>
+          <div class="pathBox" id="pathBox"></div>
+        </div>
+
+        <div class="card">
+          <div class="cardTitle">下发流表</div>
+          <div class="grid2">
+            <div class="field">
+              <div class="label">SRC MAC</div>
+              <input id="srcMac" placeholder="00:00:00:00:00:01" />
+            </div>
+            <div class="field">
+              <div class="label">DST MAC</div>
+              <input id="dstMac" placeholder="00:00:00:00:00:02" />
+            </div>
+          </div>
+          <div class="row">
+            <button id="btnPush">pushFlows</button>
+            <div class="hint">调用 /pushFlows?srcMac=...&dstMac=...</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="cardTitle">原始返回</div>
+          <div class="row">
+            <button id="btnDetails">获取 /details</button>
+            <button id="btnTopo">获取 /topo</button>
+            <button id="btnNodes">获取 /node</button>
+          </div>
+          <pre id="out" class="out"></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

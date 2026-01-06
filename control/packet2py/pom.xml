@@ -1,0 +1,80 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>org.onosproject</groupId>
+    <artifactId>onos-dependencies</artifactId>
+    <version>2.7.0</version>
+  </parent>
+
+  <groupId>org.example</groupId>
+  <artifactId>packet2py</artifactId>
+  <version>1.0.0</version>
+  <packaging>bundle</packaging>
+
+  <name>packet2py</name>
+  <description>Intercept IPv4 PacketIn and POST metadata to a Python service</description>
+
+  <properties>
+    <maven.compiler.source>11</maven.compiler.source>
+    <maven.compiler.target>11</maven.compiler.target>
+
+    <onos.app.name>org.example.packet2py</onos.app.name>
+    <onos.app.title>PacketIn To Python</onos.app.title>
+    <onos.app.origin>org.example</onos.app.origin>
+    <onos.app.category>default</onos.app.category>
+    <onos.app.url>http://example.org</onos.app.url>
+    <onos.app.readme>Intercept IPv4 PacketIn and POST metadata to Python</onos.app.readme>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.onosproject</groupId>
+      <artifactId>onos-api</artifactId>
+      <version>${onos.version}</version>
+      <scope>provided</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.onosproject</groupId>
+      <artifactId>onlab-osgi</artifactId>
+      <version>${onos.version}</version>
+      <scope>provided</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.onosproject</groupId>
+      <artifactId>onlab-misc</artifactId>
+      <version>${onos.version}</version>
+      <scope>provided</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.onosproject</groupId>
+      <artifactId>onos-api</artifactId>
+      <version>${onos.version}</version>
+      <classifier>tests</classifier>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.onosproject</groupId>
+        <artifactId>onos-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>onos-app</id>
+            <phase>package</phase>
+            <goals>
+              <goal>app</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

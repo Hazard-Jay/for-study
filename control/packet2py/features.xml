@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<features xmlns="http://karaf.apache.org/xmlns/features/v1.4.0" name="${project.artifactId}">
+  <feature name="${project.artifactId}" version="${project.version}" description="${project.description}">
+    <feature>onos-api</feature>
+    <bundle>mvn:${project.groupId}/${project.artifactId}/${project.version}</bundle>
+  </feature>
+</features>

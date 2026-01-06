@@ -1,0 +1,24 @@
+*{box-sizing:border-box}
+body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji";background:#0b1020;color:#e8eefc}
+.app{height:100vh;display:flex;flex-direction:column}
+.topbar{display:flex;align-items:center;gap:12px;padding:12px 16px;background:#0f1733;border-bottom:1px solid rgba(255,255,255,.08)}
+.brand{font-weight:700;letter-spacing:.5px}
+.actions{display:flex;gap:8px;margin-left:auto}
+.status{min-width:180px;text-align:right;opacity:.8;font-size:13px}
+button{background:#1b2a5a;color:#e8eefc;border:1px solid rgba(255,255,255,.12);padding:8px 12px;border-radius:10px;cursor:pointer}
+button:hover{background:#22366f}
+.main{flex:1;display:grid;grid-template-columns:1.2fr .8fr;gap:12px;padding:12px;min-height:0}
+.left{display:flex;flex-direction:column;min-height:0}
+.right{min-height:0}
+.panelTitle{padding:10px 12px;background:#0f1733;border:1px solid rgba(255,255,255,.08);border-radius:14px;margin-bottom:10px}
+#network{flex:1;min-height:520px;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:#0f1733}
+.right{display:flex;flex-direction:column;gap:12px;overflow:auto;padding-right:2px}
+.card{background:#0f1733;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:12px}
+.cardTitle{font-weight:650;margin-bottom:10px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.field .label{font-size:12px;opacity:.8;margin-bottom:6px}
+.field input{width:100%;padding:10px 10px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:#0b1020;color:#e8eefc;outline:none}
+.row{display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap}
+.hint{font-size:12px;opacity:.75}
+.out{margin:10px 0 0 0;max-height:240px;overflow:auto;background:#0b1020;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px;font-size:12px;line-height:1.4}
+.pathBox{margin-top:10px;padding:10px;border-radius:12px;background:#0b1020;border:1px solid rgba(255,255,255,.08);font-size:13px;min-height:44px;white-space:pre-wrap}
