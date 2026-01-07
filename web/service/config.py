@@ -28,7 +28,7 @@ class DBConfig:
     host = "192.168.241.1"
     port = 3306
     user = "sdn"
-    password = "StrongPassword_123"
+    password = "SdnPass_123!"
     database = "sdn"
     charset = "utf8mb4"
 

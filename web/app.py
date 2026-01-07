@@ -13,6 +13,9 @@ import threading
 import time
 from db.topoSave import save_all,load_topo, load_details, load_node
 
+LAST_GET = {"ts": 0.0, "httpStatus": 0, "payload": None}
+LAST_POST = {"ts": 0.0, "httpStatus": 0, "payload": None}
+
 app=Sanic("SDN")
 app.config.FALLBACK_ERROR_FORMAT = "json"
 
@@ -76,19 +79,30 @@ async def path(request):
 async def pushflows_post(request):
     data = request.json or {}
     payload, status = pushflows(data.get("srcMac"), data.get("dstMac"), data.get("deviceId"))
+    LAST_POST["ts"] = time.time()
+    LAST_POST["httpStatus"] = int(status)
+    LAST_POST["payload"] = payload
     return response.json(payload, status=status)
 
 @app.get("/pushFlows")
 async def pushflows_get(request):
-    payload, status = pushflows(request.args.get("srcMac"), request.args.get("dstMac"))
+    payload, status = pushflows(request.args.get("srcMac"), request.args.get("dstMac"), request.args.get("deviceId"))
+    LAST_GET["ts"] = time.time()
+    LAST_GET["httpStatus"] = int(status)
+    LAST_GET["payload"] = payload
     return response.json(payload, status=status)
+
+@app.get("/pushFlowsLastGet")
+async def pushflows_last_get(request):
+    return response.json(LAST_GET)
+
+@app.get("/pushFlowsLastPost")
+async def pushflows_last_post(request):
+    return response.json(LAST_POST)
 
 def poll_save_loop():
     while True:
         try:
-            # details = service.topo.getDetails(f"http://{settings.db.host}:8181/onos/v1")
-            # topo = service.topo.getTopo(f"http://{settings.db.host}:8181/onos/v1")
-            # node = service.topo.getNode(f"http://{settings.db.host}:8181/onos/v1")
             details = service.topo.getDetails(settings.onos.url)
             topo = service.topo.getTopo(settings.onos.url)
             node = service.topo.getNode(settings.onos.url)

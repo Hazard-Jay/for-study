@@ -107,56 +107,43 @@ def getTopo(l):
     # ("00:00:00:00:00:01/None", {"srcPort": "2", "dstPort": "host"})
 
 def push_flow(device_id, src_mac, dst_mac, out_port,
-              priority=10, permanent=True, timeout=0):
+              priority=40001, permanent=True, timeout=0):
     url = f"{settings.onos.url}/flows/{device_id}"
 
-    flow = {
-        "priority": int(priority),
-        "isPermanent": bool(permanent),
-        "timeout": int(timeout),
-        "deviceId": device_id,
-        "treatment": {
-            "instructions": [
-                {"type": "OUTPUT", "port": str(out_port)}
-            ]
-        },
-        "selector": {
-            "criteria": [
-                {"type": "ETH_TYPE", "ethType": "0x0800"},
-                {"type": "ETH_SRC", "mac": src_mac},
-                {"type": "ETH_DST", "mac": dst_mac}
-            ]
+    # 定义不同的 ethType 列表
+    eth_types = ["0x0800", "0x806", "0x88cc", "0x8942"]  # IPv4, ARP, LLDP, MPLS
+    
+    for ethType in eth_types:
+        # 为每个 ethType 下发流表
+        flow = {
+            "priority": int(priority),
+            "isPermanent": bool(permanent),
+            "timeout": int(timeout),
+            "deviceId": device_id,
+            "treatment": {
+                "instructions": [
+                    {"type": "OUTPUT", "port": str(out_port)}  # 输出到指定端口
+                ]
+            },
+            "selector": {
+                "criteria": [
+                    {"type": "ETH_TYPE", "ethType": ethType},  # 根据 ethType 匹配
+                    {"type": "ETH_SRC", "mac": src_mac},  # 匹配源 MAC 地址
+                    {"type": "ETH_DST", "mac": dst_mac}   # 匹配目标 MAC 地址
+                ]
+            }
         }
-    }
 
-    res = requests.post(
-        url=url,
-        json=flow,
-        headers=settings.onos.headers,
-        auth=settings.onos.auth,
-        timeout=2
-    )
+        # 发送 POST 请求下发流表
+        res = requests.post(
+            url=url,
+            json=flow,
+            headers=settings.onos.headers,
+            auth=settings.onos.auth,
+            timeout=2
+        )
 
     return res.status_code, res.text
-
-
-def delete_all_flows(device_id):
-    """
-    删除某个设备上的所有流表
-    """
-    url = f"{settings.onos.url}/flows/application/{device_id}"
-    res = requests.delete(
-        url=url,
-        headers=settings.onos.headers,
-        auth=settings.onos.auth
-    )
-
-    if res.status_code in (200, 202, 204):
-        print(f"[OK] delete_all_flows on {device_id}")
-    else:
-        print(f"[ERR] delete_all_flows status={res.status_code}, body={res.text}")
-
-    return res
 
 def findId(topo_raw, mac):
     """

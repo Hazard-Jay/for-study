@@ -5,75 +5,163 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>SDN 控制面板</title>
   <link rel="stylesheet" href="/static/style.css" />
-  <script src="/static/vis-network.min.js"></script>
 </head>
 <body>
-  <div class="app">
-    <div class="topbar">
-      <div class="brand">SDN 控制面板</div>
-      <div class="actions">
-        <button id="btnRefresh">刷新拓扑</button>
-        <button id="btnClear">清空选择</button>
-      </div>
-      <div class="status" id="status">未加载</div>
+  <header class="header">
+    <div class="title">
+      <div class="h1">SDN 控制面板</div>
+      <div class="sub">显示数据库缓存最新拓扑/节点信息，输入 MAC 计算路径并下发流表（POST /pushFlows）</div>
     </div>
-
-    <div class="main">
-      <div class="left">
-        <div class="panelTitle">拓扑</div>
-        <div id="network"></div>
+    <div class="header-actions">
+      <button id="btnRefresh" class="btn">立即刷新</button>
+      <div class="toggle">
+        <input id="autoRefresh" type="checkbox" checked />
+        <label for="autoRefresh">自动刷新</label>
       </div>
+      <select id="refreshItv" class="select">
+        <option value="2000">2s</option>
+        <option value="5000" selected>5s</option>
+        <option value="10000">10s</option>
+        <option value="30000">30s</option>
+      </select>
+      <div id="lastRefresh" class="meta">未刷新</div>
+    </div>
+  </header>
 
-      <div class="right">
-        <div class="card">
-          <div class="cardTitle">已选端点</div>
-          <div class="grid2">
-            <div class="field">
-              <div class="label">SRC Host ID</div>
-              <input id="srcHostId" placeholder="点击拓扑里的 host 自动填充" />
-            </div>
-            <div class="field">
-              <div class="label">DST Host ID</div>
-              <input id="dstHostId" placeholder="点击拓扑里的 host 自动填充" />
-            </div>
-          </div>
-          <div class="row">
-            <button id="btnPath">计算路径</button>
-            <div class="hint">调用 /path?src=...&dst=...</div>
-          </div>
-          <div class="pathBox" id="pathBox"></div>
-        </div>
-
-        <div class="card">
-          <div class="cardTitle">下发流表</div>
-          <div class="grid2">
-            <div class="field">
-              <div class="label">SRC MAC</div>
-              <input id="srcMac" placeholder="00:00:00:00:00:01" />
-            </div>
-            <div class="field">
-              <div class="label">DST MAC</div>
-              <input id="dstMac" placeholder="00:00:00:00:00:02" />
-            </div>
-          </div>
-          <div class="row">
-            <button id="btnPush">pushFlows</button>
-            <div class="hint">调用 /pushFlows?srcMac=...&dstMac=...</div>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="cardTitle">原始返回</div>
-          <div class="row">
-            <button id="btnDetails">获取 /details</button>
-            <button id="btnTopo">获取 /topo</button>
-            <button id="btnNodes">获取 /node</button>
-          </div>
-          <pre id="out" class="out"></pre>
+  <main class="grid">
+    <section class="card">
+      <div class="card-hd">
+        <div class="card-title">节点列表（/node）</div>
+        <div class="card-tools">
+          <input id="nodeFilter" class="input" placeholder="搜索：of: 或 MAC 或 hostId" />
+          <div id="nodeCount" class="pill">0</div>
         </div>
       </div>
+      <div class="card-bd">
+        <div id="nodeList" class="list"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-hd">
+        <div class="card-title">最新节点详细信息（/details）</div>
+        <div class="card-tools">
+          <div id="detailsStat" class="pill">devices: 0 | hosts: 0 | links: 0</div>
+          <button id="btnCopyDetails" class="btn btn-ghost">复制 JSON</button>
+        </div>
+      </div>
+      <div class="card-bd">
+        <div class="tabs">
+          <button class="tab active" data-tab="detailsSummary">摘要</button>
+          <button class="tab" data-tab="detailsJson">原始 JSON</button>
+        </div>
+        <div id="detailsSummary" class="tabpane active">
+          <div class="two-col">
+            <div>
+              <div class="pane-title">Devices</div>
+              <div id="devicesTable" class="table"></div>
+            </div>
+            <div>
+              <div class="pane-title">Hosts</div>
+              <div id="hostsTable" class="table"></div>
+            </div>
+          </div>
+          <div class="pane-title mt16">Links</div>
+          <div id="linksTable" class="table"></div>
+        </div>
+        <div id="detailsJson" class="tabpane">
+          <pre id="detailsPre" class="pre"></pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-hd">
+        <div class="card-title">拓扑邻接表（/topo）</div>
+        <div class="card-tools">
+          <button id="btnCopyTopo" class="btn btn-ghost">复制 JSON</button>
+        </div>
+      </div>
+      <div class="card-bd">
+        <pre id="topoPre" class="pre"></pre>
+      </div>
+    </section>
+
+<section class="card">
+  <div class="card-hd">
+    <div class="card-title">GET 计算路径并下发（/pushFlows）</div>
+    <div class="card-tools">
+      <span id="pushStatusGet" class="status">空闲</span>
     </div>
   </div>
+  <div class="card-bd">
+    <div class="form">
+      <div class="row">
+        <div class="field">
+          <label>srcMac</label>
+          <input id="srcMacGet" class="input" placeholder="00:00:00:00:00:01" />
+        </div>
+        <div class="field">
+          <label>dstMac</label>
+          <input id="dstMacGet" class="input" placeholder="00:00:00:00:00:02" />
+        </div>
+        <div class="field">
+          <label>deviceId（可选）</label>
+          <input id="deviceIdGet" class="input" placeholder="of:0000000000000001" />
+        </div>
+      </div>
+      <div class="row">
+        <button id="btnPushGet" class="btn btn-primary">GET 计算并下发</button>
+        <button id="btnClearGet" class="btn">清空</button>
+        <button id="btnCopyGet" class="btn btn-ghost">复制 GET JSON</button>
+      </div>
+    </div>
+
+    <div class="result">
+      <div class="result-line">
+        <div class="pill" id="pushMetaGet">尚未执行</div>
+      </div>
+
+      <div class="pane-title mt16">Path</div>
+      <div id="pathViewGet" class="path"></div>
+
+      <div class="pane-title mt16">Flow Results</div>
+      <div id="flowTableGet" class="table"></div>
+
+      <div class="pane-title mt16">原始返回 JSON</div>
+      <pre id="pushPreGet" class="pre"></pre>
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-hd">
+    <div class="card-title">POST 结果展示（监听 /pushFlows 收到的最新返回）</div>
+    <div class="card-tools">
+      <span id="pushStatusPost" class="status">监听中</span>
+      <button id="btnCopyPost" class="btn btn-ghost">复制 POST JSON</button>
+      <button id="btnClearPost" class="btn">清空</button>
+    </div>
+  </div>
+  <div class="card-bd">
+    <div class="result">
+      <div class="result-line">
+        <div class="pill" id="pushMetaPost">暂无 POST</div>
+      </div>
+
+      <div class="pane-title mt16">Path</div>
+      <div id="pathViewPost" class="path"></div>
+
+      <div class="pane-title mt16">Flow Results</div>
+      <div id="flowTablePost" class="table"></div>
+
+      <div class="pane-title mt16">原始返回 JSON</div>
+      <pre id="pushPrePost" class="pre"></pre>
+    </div>
+  </div>
+</section>
+
+  </main>
 
   <script src="/static/app.js"></script>
 </body>

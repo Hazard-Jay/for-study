@@ -22,7 +22,7 @@ def _loads(x):
         x = x.decode("utf-8")
     return json.loads(x)
 
-def save_all(details_obj, topo_obj, node_obj, keep=10):
+def save_all(details_obj, topo_obj, node_obj, keep=100):
     details_s = json.dumps(details_obj, ensure_ascii=False)
     topo_s = json.dumps(topo_obj, ensure_ascii=False)
     node_s = json.dumps(node_obj, ensure_ascii=False)
@@ -103,5 +103,20 @@ def load_node():
             if not row:
                 return None
             return _loads(row[0])
+    finally:
+        conn.close()
+
+def fetch_topology_data():
+    conn = connect()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, name FROM devices")
+            devices = cur.fetchall()
+            cur.execute("SELECT id, ipAddress FROM hosts")
+            hosts = cur.fetchall()
+            cur.execute("SELECT src_device, dst_device, src_port, dst_port FROM links")
+            links = cur.fetchall()
+
+        return {"devices": devices, "hosts": hosts, "links": links}
     finally:
         conn.close()
