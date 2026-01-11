@@ -11,7 +11,7 @@ from collections import defaultdict
 from service.pushflows import pushflows
 import threading
 import time
-from db.topoSave import save_all,load_topo, load_details, load_node
+from db.topoSave import save_all,load_topo, load_details, load_node,save_device_delay_data
 
 LAST_GET = {"ts": 0.0, "httpStatus": 0, "payload": None}
 LAST_POST = {"ts": 0.0, "httpStatus": 0, "payload": None}
@@ -92,6 +92,22 @@ async def pushflows_get(request):
     LAST_GET["payload"] = payload
     return response.json(payload, status=status)
 
+@app.post("/delays")
+async def delays_post(request: Request):
+    data = request.json()  # 获取 JSON 数据
+    device_id = data.get("deviceId")
+    port = data.get("port")
+    delay = data.get("delay")
+    if not device_id or not port or delay is None:
+        raise HTTPException(status_code=400, detail="Missing deviceId, port, or delay in request")
+
+    # 调用数据库存储函数
+    try:
+        sid = save_device_delay_data(device_id, port, delay)
+        return JSONResponse(content={"status": "success", "sid": sid}, status_code=200)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        
 @app.get("/pushFlowsLastGet")
 async def pushflows_last_get(request):
     return response.json(LAST_GET)

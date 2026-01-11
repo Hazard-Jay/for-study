@@ -70,6 +70,34 @@ def save_all(details_obj, topo_obj, node_obj, keep=100):
     finally:
         conn.close()
 
+def save_device_delay_data(device_id, port, delay, keep=100):
+    conn = connect()
+    conn.autocommit = False
+    try:
+        with conn.cursor() as cur:
+            # 插入设备信息、端口和时延数据
+            cur.execute(
+                "INSERT INTO device_delay_data(device_id, port, delay) "
+                "VALUES (%s, %s, %s) RETURNING id",
+                (device_id, port, delay)
+            )
+            sid = cur.fetchone()[0]  # 获取插入的记录的 ID
+
+            # 删除超过数量限制的历史数据
+            cur.execute(
+                "DELETE FROM device_delay_data WHERE id NOT IN "
+                "(SELECT id FROM (SELECT id FROM device_delay_data ORDER BY id DESC LIMIT %s) t)",
+                (int(keep),)
+            )
+
+        conn.commit()
+        return sid  # 返回插入数据的 ID
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
 def load_details():
     conn = connect()
     try:
@@ -105,6 +133,29 @@ def load_node():
             return _loads(row[0])
     finally:
         conn.close()
+
+def get_delay_from_db(device_id_v, dst_port):
+    """根据目的设备 ID 和目的端口号查询设备之间的时延"""
+    conn = connect()
+    try:
+        with conn.cursor() as cur:
+            # 查询设备 v 和端口 dst_port 对应的设备 u 和端口 src_port 的时延
+            cur.execute("""
+                SELECT device_id, port, delay 
+                FROM device_delay_data
+                WHERE device_id = %s AND port = %s
+            """, (device_id_v, dst_port))
+            
+            row = cur.fetchone()
+            if row:
+                # 如果找到，返回设备 u 和端口的时延
+                device_id_u, port, delay = row
+                return delay  # 返回时延
+            else:
+                return None  # 如果没有找到时延，返回 None
+    finally:
+        conn.close()
+
 
 def fetch_topology_data():
     conn = connect()

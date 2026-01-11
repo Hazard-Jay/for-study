@@ -61,20 +61,14 @@ public class PacketInToPythonApp {
     }
 
     private void requestIntercepts() {
-        TrafficSelector.Builder s1 = DefaultTrafficSelector.builder();
-        s1.matchEthType(Ethernet.TYPE_ARP);
-        packetService.requestPackets(s1.build(), PacketPriority.REACTIVE, appId);
-
+        // 只拦截 IPv4 包
         TrafficSelector.Builder s2 = DefaultTrafficSelector.builder();
         s2.matchEthType(Ethernet.TYPE_IPV4);
         packetService.requestPackets(s2.build(), PacketPriority.REACTIVE, appId);
     }
 
     private void withdrawIntercepts() {
-        TrafficSelector.Builder s1 = DefaultTrafficSelector.builder();
-        s1.matchEthType(Ethernet.TYPE_ARP);
-        packetService.cancelPackets(s1.build(), PacketPriority.REACTIVE, appId);
-
+        // 取消拦截 IPv4 包
         TrafficSelector.Builder s2 = DefaultTrafficSelector.builder();
         s2.matchEthType(Ethernet.TYPE_IPV4);
         packetService.cancelPackets(s2.build(), PacketPriority.REACTIVE, appId);
@@ -96,12 +90,7 @@ public class PacketInToPythonApp {
             DeviceId deviceId = inPkt.receivedFrom().deviceId();
             PortNumber inPort = inPkt.receivedFrom().port();
 
-            if (eth.getEtherType() == Ethernet.TYPE_ARP) {
-                context.treatmentBuilder().setOutput(PortNumber.FLOOD);
-                context.send();
-                return;
-            }
-
+            // 只处理 IPv4 包
             if (eth.getEtherType() != Ethernet.TYPE_IPV4) {
                 return;
             }
@@ -109,6 +98,7 @@ public class PacketInToPythonApp {
             MacAddress srcMac = eth.getSourceMAC();
             MacAddress dstMac = eth.getDestinationMAC();
 
+            // 调用 Python 服务获取输出端口
             String outPort = callPythonService(srcMac, dstMac, deviceId, inPort);
             if (outPort != null && !outPort.isEmpty()) {
                 try {

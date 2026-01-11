@@ -1,0 +1,8 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: ONOS LLDP App
+Bundle-SymbolicName: org.onosproject.lldpapp
+Bundle-Version: 1.0.0
+Bundle-Activator: org.onosproject.lldpapp.LldpAppActivator
+Export-Package: org.onosproject.lldpapp
+Import-Package: org.onosproject.core, org.onosproject.net, org.onosproject.net.packet, *
